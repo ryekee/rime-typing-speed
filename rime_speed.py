@@ -9,6 +9,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -384,6 +385,57 @@ end
 
 return P
 """
+
+
+class PatchError(Exception):
+    pass
+
+
+PATCH_BEGIN = "  # >>> rime-speed >>>"
+PATCH_LINE = '  "engine/processors/@before 0": lua_processor@*speed_logger'
+PATCH_END = "  # <<< rime-speed <<<"
+PATCH_BLOCK = "\n".join([PATCH_BEGIN, PATCH_LINE, PATCH_END])
+
+
+def merge_processor_patch(text: str) -> str:
+    if PATCH_BEGIN in text:
+        return text  # idempotent
+    # Reject an inline `patch: {...}` mapping we cannot safely edit as text.
+    if re.search(r"^patch:[ \t]*\S", text, re.M):
+        raise PatchError("existing inline `patch:` mapping; add the processor manually")
+
+    lines = text.splitlines()
+    out = []
+    inserted = False
+    for ln in lines:
+        out.append(ln)
+        if not inserted and re.match(r"^patch:[ \t]*$", ln):
+            out.append(PATCH_BLOCK)
+            inserted = True
+    if not inserted:
+        if out and out[-1].strip() != "":
+            out.append("")
+        out.append("patch:")
+        out.append(PATCH_BLOCK)
+    return "\n".join(out) + "\n"
+
+
+def remove_processor_patch(text: str) -> str:
+    if PATCH_BEGIN not in text:
+        return text
+    out = []
+    skip = False
+    for ln in text.splitlines():
+        if ln == PATCH_BEGIN:
+            skip = True
+            continue
+        if ln == PATCH_END:
+            skip = False
+            continue
+        if not skip:
+            out.append(ln)
+    result = "\n".join(out)
+    return result.rstrip("\n") + ("\n" if result.strip() else "")
 
 
 def _load(args) -> List[Commit]:
