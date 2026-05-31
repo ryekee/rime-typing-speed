@@ -5,6 +5,7 @@ Single-file, standard-library-only CLI. See docs/superpowers for design.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import sys
 import time
@@ -171,6 +172,60 @@ def by_schema(commits, **opts) -> Dict[str, Summary]:
     for c in commits:
         groups.setdefault(c.s, []).append(c)
     return {s: summarize(cs, **opts) for s, cs in groups.items()}
+
+
+def day_bounds(date_str: str) -> Tuple[int, int]:
+    d = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    start = int(time.mktime(d.timetuple()))
+    return start, start + 86400
+
+
+def filter_range(commits, start_ts: int, end_ts: int) -> List[Commit]:
+    return [c for c in commits if start_ts <= c.t < end_ts]
+
+
+def _fmt_minutes(seconds: int) -> str:
+    m, s = divmod(int(seconds), 60)
+    return f"{m}分{s}秒" if m else f"{s}秒"
+
+
+def format_today(summary: Summary, by_schema_map: Dict[str, Summary]) -> str:
+    lines = [
+        "今日打字统计",
+        f"  上屏字数：{summary.chars}（汉字 {summary.han}）",
+        f"  净速度：{summary.net_cpm:.1f} 字/分钟（活跃 {_fmt_minutes(summary.active_seconds)}）",
+        f"  毛速度：{summary.gross_cpm:.1f} 字/分钟",
+        f"  峰值速度：{summary.peak_cpm:.1f} 字/分钟",
+        f"  码字效率：{summary.eff:.2f} 字/击键",
+        f"  会话数：{summary.sessions}，上屏次数：{summary.commits}",
+    ]
+    if len(by_schema_map) > 1:
+        lines.append("  按方案：")
+        for name, s in sorted(by_schema_map.items(), key=lambda kv: -kv[1].chars):
+            lines.append(f"    {name}: {s.chars} 字，净 {s.net_cpm:.1f} 字/分钟")
+    return "\n".join(lines)
+
+
+def format_report(label: str, summary: Summary, by_schema_map: Dict[str, Summary],
+                  by_hour_map: Dict[int, int]) -> str:
+    lines = [
+        f"{label} 打字统计",
+        f"  上屏字数：{summary.chars}（汉字 {summary.han}）",
+        f"  净速度：{summary.net_cpm:.1f} 字/分钟",
+        f"  毛速度：{summary.gross_cpm:.1f} 字/分钟",
+        f"  峰值速度：{summary.peak_cpm:.1f} 字/分钟",
+        f"  码字效率：{summary.eff:.2f} 字/击键",
+        f"  会话数：{summary.sessions}，上屏次数：{summary.commits}",
+    ]
+    if by_schema_map:
+        lines.append("  按方案：")
+        for name, s in sorted(by_schema_map.items(), key=lambda kv: -kv[1].chars):
+            lines.append(f"    {name}: {s.chars} 字，净 {s.net_cpm:.1f} 字/分钟")
+    if by_hour_map:
+        lines.append("  按小时（字数）：")
+        for hour in sorted(by_hour_map):
+            lines.append(f"    {hour:02d}:00  {by_hour_map[hour]}")
+    return "\n".join(lines)
 
 
 def main(argv=None) -> int:
