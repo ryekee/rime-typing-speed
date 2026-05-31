@@ -5,6 +5,7 @@ Single-file, standard-library-only CLI. See docs/superpowers for design.
 """
 from __future__ import annotations
 
+import argparse
 import datetime
 import json
 import sys
@@ -228,10 +229,79 @@ def format_report(label: str, summary: Summary, by_schema_map: Dict[str, Summary
     return "\n".join(lines)
 
 
+def log_path() -> Path:
+    return Path.home() / "Library" / "Application Support" / "rime-speed" / "commits.jsonl"
+
+
+def _load(args) -> List[Commit]:
+    path = args.log if getattr(args, "log", None) else log_path()
+    commits = read_log(path)
+    if getattr(args, "from_ts", None) is not None or getattr(args, "to_ts", None) is not None:
+        lo = args.from_ts if args.from_ts is not None else 0
+        hi = args.to_ts if args.to_ts is not None else 2**62
+        commits = filter_range(commits, lo, hi)
+    elif getattr(args, "day", None):
+        lo, hi = day_bounds(args.day)
+        commits = filter_range(commits, lo, hi)
+    return commits
+
+
+def cmd_today(args) -> int:
+    import datetime as _dt
+    today = _dt.date.fromtimestamp(time.time()).isoformat()
+    lo, hi = day_bounds(today)
+    commits = filter_range(read_log(args.log if args.log else log_path()), lo, hi)
+    print(format_today(summarize(commits), by_schema(commits)))
+    return 0
+
+
+def cmd_report(args) -> int:
+    commits = _load(args)
+    label = args.day if args.day else "区间"
+    print(format_report(label, summarize(commits), by_schema(commits), by_hour(commits)))
+    return 0
+
+
+def cmd_export(args) -> int:
+    import csv
+    commits = _load(args)
+    w = csv.writer(sys.stdout)
+    w.writerow(["t", "c", "han", "lat", "dig", "oth", "k", "s"])
+    for c in commits:
+        w.writerow([c.t, c.c, c.han, c.lat, c.dig, c.oth, c.k, c.s])
+    return 0
+
+
+def _add_log_args(p):
+    p.add_argument("--log", default=None, help="path to commits.jsonl")
+    p.add_argument("--day", default=None, help="YYYY-MM-DD (local)")
+    p.add_argument("--from-ts", dest="from_ts", type=int, default=None)
+    p.add_argument("--to-ts", dest="to_ts", type=int, default=None)
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    print("rime-speed: not implemented yet")
-    return 0
+    parser = argparse.ArgumentParser(prog="rime-speed", description="Chinese typing-speed stats for Rime")
+    sub = parser.add_subparsers(dest="cmd")
+
+    p_today = sub.add_parser("today", help="today's stats")
+    p_today.add_argument("--log", default=None)
+    p_today.set_defaults(func=cmd_today)
+
+    p_report = sub.add_parser("report", help="stats for a day or timestamp range")
+    _add_log_args(p_report)
+    p_report.set_defaults(func=cmd_report)
+
+    p_export = sub.add_parser("export", help="export raw records")
+    _add_log_args(p_export)
+    p_export.add_argument("--csv", action="store_true")
+    p_export.set_defaults(func=cmd_export)
+
+    args = parser.parse_args(argv)
+    if not getattr(args, "cmd", None):
+        parser.print_help()
+        return 0
+    return args.func(args)
 
 
 if __name__ == "__main__":
