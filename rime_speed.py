@@ -537,6 +537,57 @@ def cmd_export(args) -> int:
     return 0
 
 
+SQUIRREL_BIN = "/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
+
+
+def deploy() -> None:
+    subprocess.run([SQUIRREL_BIN, "--reload"], check=False)
+
+
+def cmd_install(args) -> int:
+    rdir = rime_dir()
+    ensure_data_dir()
+    dest = write_lua()
+    schemas = [args.schema] if args.schema else discover_schemas(rdir)
+    patched = []
+    for sc in schemas:
+        if patch_schema_custom(rdir, sc):
+            patched.append(sc)
+    print(f"已写入 Lua：{dest}")
+    print(f"已挂载方案：{', '.join(schemas) if schemas else '(无)'}")
+    if patched:
+        print(f"  本次新增 patch：{', '.join(patched)}")
+    print(f"日志目录：{data_dir()}")
+    if not args.no_deploy:
+        deploy()
+        print("已触发 Squirrel 重新部署。")
+    else:
+        print("跳过部署（--no-deploy）。手动部署：Squirrel --reload")
+    return 0
+
+
+def cmd_uninstall(args) -> int:
+    rdir = rime_dir()
+    schemas = [args.schema] if args.schema else discover_schemas(rdir)
+    for sc in schemas:
+        unpatch_schema_custom(rdir, sc)
+    dest = lua_dest()
+    if dest.exists():
+        dest.unlink()
+    print("已移除 Lua 与各方案 patch。")
+    if args.purge:
+        log = log_path()
+        if log.exists():
+            log.unlink()
+        print(f"已清空日志：{log}")
+    else:
+        print(f"日志保留在：{log_path()}（加 --purge 可删除）")
+    if not args.no_deploy:
+        deploy()
+        print("已触发 Squirrel 重新部署。")
+    return 0
+
+
 def _add_log_args(p):
     p.add_argument("--log", default=None, help="path to commits.jsonl")
     p.add_argument("--day", default=None, help="YYYY-MM-DD (local)")
@@ -561,6 +612,17 @@ def main(argv=None) -> int:
     _add_log_args(p_export)
     p_export.add_argument("--csv", action="store_true", help="输出 CSV（当前唯一格式，默认即为 CSV）")
     p_export.set_defaults(func=cmd_export)
+
+    p_install = sub.add_parser("install", help="install the Lua logger into your schemas")
+    p_install.add_argument("--schema", default=None, help="only this schema (default: all)")
+    p_install.add_argument("--no-deploy", action="store_true")
+    p_install.set_defaults(func=cmd_install)
+
+    p_uninstall = sub.add_parser("uninstall", help="remove the Lua logger")
+    p_uninstall.add_argument("--schema", default=None)
+    p_uninstall.add_argument("--no-deploy", action="store_true")
+    p_uninstall.add_argument("--purge", action="store_true", help="also delete the log file")
+    p_uninstall.set_defaults(func=cmd_uninstall)
 
     args = parser.parse_args(argv)
     if not getattr(args, "cmd", None):
