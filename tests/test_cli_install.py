@@ -40,7 +40,9 @@ def test_uninstall_reverts(monkeypatch, tmp_path):
     _seed_rime(tmp_path)
     rime_speed.main(["install", "--no-deploy"])
     rime_speed.main(["uninstall", "--no-deploy"])
-    assert "speed_logger" not in (tmp_path / "rime_ice.custom.yaml").read_text()
+    # install created these fresh; uninstall removes our block -> empty -> deleted
+    assert not (tmp_path / "rime_ice.custom.yaml").exists()
+    assert not (tmp_path / "t9.custom.yaml").exists()
     assert not (tmp_path / "lua" / "speed_logger.lua").exists()
 
 

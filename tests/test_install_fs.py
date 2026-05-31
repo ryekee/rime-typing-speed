@@ -43,3 +43,11 @@ def test_unpatch_removes_only_our_lines(monkeypatch, tmp_path):
     rime_speed.unpatch_schema_custom(tmp_path, "rime_ice")
     body = cust.read_text(encoding="utf-8")
     assert "menu/page_size: 7" in body and "speed_logger" not in body
+
+
+def test_unpatch_deletes_file_it_created(monkeypatch, tmp_path):
+    monkeypatch.setenv("RIME_DIR", str(tmp_path))
+    rime_speed.patch_schema_custom(tmp_path, "t9")   # creates t9.custom.yaml fresh
+    assert (tmp_path / "t9.custom.yaml").exists()
+    rime_speed.unpatch_schema_custom(tmp_path, "t9")
+    assert not (tmp_path / "t9.custom.yaml").exists()

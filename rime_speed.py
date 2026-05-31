@@ -396,10 +396,19 @@ PATCH_LINE = '  "engine/processors/@before 0": lua_processor@*speed_logger'
 PATCH_END = "  # <<< rime-speed <<<"
 PATCH_BLOCK = "\n".join([PATCH_BEGIN, PATCH_LINE, PATCH_END])
 
+# Stripped fence markers (column 0). remove_processor_patch matches on these so
+# both fence forms (indented entry, or whole-section) are handled.
+_BEGIN_MARK = PATCH_BEGIN.strip()
+_END_MARK = PATCH_END.strip()
+
+# Used when the file has no `patch:` key yet: the fence wraps the `patch:` header
+# itself, so removal restores the file exactly (a true inverse).
+PATCH_SECTION = "\n".join([_BEGIN_MARK, "patch:", PATCH_LINE, _END_MARK])
+
 
 def merge_processor_patch(text: str) -> str:
-    if PATCH_BEGIN in text:
-        return text  # idempotent
+    if _BEGIN_MARK in text:
+        return text  # idempotent (matches either fence form)
     # Reject an inline `patch: {...}` mapping we cannot safely edit as text.
     if re.search(r"^patch:[ \t]*\S", text, re.M):
         raise PatchError("existing inline `patch:` mapping; add the processor manually")
@@ -415,21 +424,21 @@ def merge_processor_patch(text: str) -> str:
     if not inserted:
         if out and out[-1].strip() != "":
             out.append("")
-        out.append("patch:")
-        out.append(PATCH_BLOCK)
+        out.append(PATCH_SECTION)
     return "\n".join(out) + "\n"
 
 
 def remove_processor_patch(text: str) -> str:
-    if PATCH_BEGIN not in text:
+    if _BEGIN_MARK not in text:
         return text
     out = []
     skip = False
     for ln in text.splitlines():
-        if ln == PATCH_BEGIN:
+        s = ln.strip()
+        if s == _BEGIN_MARK:
             skip = True
             continue
-        if ln == PATCH_END:
+        if s == _END_MARK:
             skip = False
             continue
         if not skip:
@@ -443,7 +452,8 @@ def discover_schemas(rdir) -> List[str]:
     for fname in ("default.custom.yaml", "default.yaml"):
         p = rdir / fname
         if p.exists():
-            ids = re.findall(r"-\s*schema:\s*([A-Za-z0-9_]+)", p.read_text(encoding="utf-8"))
+            ids = re.findall(r"^[ \t]*-\s*schema:\s*([A-Za-z0-9_]+)",
+                             p.read_text(encoding="utf-8"), re.M)
             if ids:
                 # preserve order, drop dupes
                 seen: set = set()
@@ -465,10 +475,25 @@ def ensure_data_dir() -> Path:
     return d
 
 
+def _atomic_write(path: Path, content: str) -> None:
+    import tempfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".rime-speed-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def write_lua() -> Path:
     dest = lua_dest()
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(_SPEED_LOGGER_LUA, encoding="utf-8")
+    _atomic_write(dest, _SPEED_LOGGER_LUA)
     return dest
 
 
@@ -482,7 +507,7 @@ def patch_schema_custom(rdir, schema) -> bool:
     merged = merge_processor_patch(original)
     if merged == original:
         return False
-    p.write_text(merged, encoding="utf-8")
+    _atomic_write(p, merged)
     return True
 
 
@@ -494,7 +519,10 @@ def unpatch_schema_custom(rdir, schema) -> bool:
     cleaned = remove_processor_patch(original)
     if cleaned == original:
         return False
-    p.write_text(cleaned, encoding="utf-8")
+    if cleaned.strip() == "":
+        p.unlink()  # delete a file that becomes empty (we created it)
+    else:
+        _atomic_write(p, cleaned)
     return True
 
 
@@ -540,8 +568,14 @@ def cmd_export(args) -> int:
 SQUIRREL_BIN = "/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel"
 
 
-def deploy() -> None:
-    subprocess.run([SQUIRREL_BIN, "--reload"], check=False)
+def deploy() -> bool:
+    try:
+        subprocess.run([SQUIRREL_BIN, "--reload"], check=False)
+        return True
+    except FileNotFoundError:
+        print(f"未找到 Squirrel（{SQUIRREL_BIN}）；请手动部署：Squirrel --reload",
+              file=sys.stderr)
+        return False
 
 
 def cmd_install(args) -> int:
@@ -559,8 +593,8 @@ def cmd_install(args) -> int:
         print(f"  本次新增 patch：{', '.join(patched)}")
     print(f"日志目录：{data_dir()}")
     if not args.no_deploy:
-        deploy()
-        print("已触发 Squirrel 重新部署。")
+        if deploy():
+            print("已触发 Squirrel 重新部署。")
     else:
         print("跳过部署（--no-deploy）。手动部署：Squirrel --reload")
     return 0
@@ -583,8 +617,8 @@ def cmd_uninstall(args) -> int:
     else:
         print(f"日志保留在：{log_path()}（加 --purge 可删除）")
     if not args.no_deploy:
-        deploy()
-        print("已触发 Squirrel 重新部署。")
+        if deploy():
+            print("已触发 Squirrel 重新部署。")
     return 0
 
 

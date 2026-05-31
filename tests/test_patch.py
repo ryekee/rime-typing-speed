@@ -11,7 +11,7 @@ def test_merge_into_empty_file_creates_patch_block():
     out = rime_speed.merge_processor_patch("")
     assert "patch:" in out
     assert LINE in out
-    assert rime_speed.PATCH_BEGIN in out and rime_speed.PATCH_END in out
+    assert rime_speed.PATCH_BEGIN.strip() in out and rime_speed.PATCH_END.strip() in out
 
 
 def test_merge_inserts_under_existing_block_patch():
@@ -52,3 +52,14 @@ def test_remove_is_inverse_of_merge():
 def test_remove_noop_when_absent():
     src = "patch:\n  key/foo: bar\n"
     assert rime_speed.remove_processor_patch(src) == src
+
+
+def test_merge_then_remove_is_inverse_empty_file():
+    merged = rime_speed.merge_processor_patch("")
+    assert rime_speed.remove_processor_patch(merged) == ""
+
+
+def test_merge_then_remove_is_inverse_no_patch_key():
+    src = "# comment\nkey: 1\n"
+    merged = rime_speed.merge_processor_patch(src)
+    assert rime_speed.remove_processor_patch(merged) == src
