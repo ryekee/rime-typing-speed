@@ -35,6 +35,6 @@ rime-speed uninstall                   # 卸载（加 --purge 删日志）
 
 ## 局限
 
-仅统计经 Rime compose 上屏的字符；纯英文 ASCII 直通模式打的字不计入。时间戳为秒级。
+仅统计经 Rime compose 上屏的字符；纯英文 ASCII 直通模式打的字不计入。时间戳为秒级：手速很快（同一秒内多次上屏）时，净速度会偏保守，可视作下限，爆发段以毛速度/峰值为准。新增输入方案后需重新 `rime-speed install` 才会纳入统计。
 
 GPL-3.0。

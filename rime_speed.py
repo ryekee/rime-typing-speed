@@ -452,7 +452,7 @@ def discover_schemas(rdir) -> List[str]:
     for fname in ("default.custom.yaml", "default.yaml"):
         p = rdir / fname
         if p.exists():
-            ids = re.findall(r"^[ \t]*-\s*schema:\s*([A-Za-z0-9_]+)",
+            ids = re.findall(r"^[ \t]*-\s*schema:\s*([A-Za-z0-9_.\-]+)",
                              p.read_text(encoding="utf-8"), re.M)
             if ids:
                 # preserve order, drop dupes
