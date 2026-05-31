@@ -438,6 +438,27 @@ def remove_processor_patch(text: str) -> str:
     return result.rstrip("\n") + ("\n" if result.strip() else "")
 
 
+def discover_schemas(rdir) -> List[str]:
+    rdir = Path(rdir)
+    for fname in ("default.custom.yaml", "default.yaml"):
+        p = rdir / fname
+        if p.exists():
+            ids = re.findall(r"-\s*schema:\s*([A-Za-z0-9_]+)", p.read_text(encoding="utf-8"))
+            if ids:
+                # preserve order, drop dupes
+                seen: set = set()
+                ordered = []
+                for i in ids:
+                    if i not in seen:
+                        seen.add(i)
+                        ordered.append(i)
+                return ordered
+    out = []
+    for p in sorted(rdir.glob("*.schema.yaml")):
+        out.append(p.name[: -len(".schema.yaml")])
+    return out
+
+
 def _load(args) -> List[Commit]:
     path = args.log if getattr(args, "log", None) else log_path()
     commits = read_log(path)
