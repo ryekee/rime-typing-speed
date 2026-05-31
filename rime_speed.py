@@ -459,6 +459,45 @@ def discover_schemas(rdir) -> List[str]:
     return out
 
 
+def ensure_data_dir() -> Path:
+    d = data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def write_lua() -> Path:
+    dest = lua_dest()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(_SPEED_LOGGER_LUA, encoding="utf-8")
+    return dest
+
+
+def _custom_path(rdir, schema) -> Path:
+    return Path(rdir) / f"{schema}.custom.yaml"
+
+
+def patch_schema_custom(rdir, schema) -> bool:
+    p = _custom_path(rdir, schema)
+    original = p.read_text(encoding="utf-8") if p.exists() else ""
+    merged = merge_processor_patch(original)
+    if merged == original:
+        return False
+    p.write_text(merged, encoding="utf-8")
+    return True
+
+
+def unpatch_schema_custom(rdir, schema) -> bool:
+    p = _custom_path(rdir, schema)
+    if not p.exists():
+        return False
+    original = p.read_text(encoding="utf-8")
+    cleaned = remove_processor_patch(original)
+    if cleaned == original:
+        return False
+    p.write_text(cleaned, encoding="utf-8")
+    return True
+
+
 def _load(args) -> List[Commit]:
     path = args.log if getattr(args, "log", None) else log_path()
     commits = read_log(path)
