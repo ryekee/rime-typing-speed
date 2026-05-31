@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
@@ -118,6 +119,58 @@ def peak_speed(commits, window_seconds: int = 60) -> float:
             if span > 0:
                 best = max(best, chars / span * 60.0)
     return best
+
+
+class Summary(NamedTuple):
+    chars: int
+    han: int
+    commits: int
+    sessions: int
+    active_seconds: int
+    net_cpm: float
+    gross_cpm: float
+    peak_cpm: float
+    eff: float
+
+
+def efficiency(commits) -> float:
+    chars = sum(c.c for c in commits)
+    keys = sum(c.k for c in commits)
+    if keys <= 0:
+        return 0.0
+    return chars / keys
+
+
+def by_hour(commits) -> Dict[int, int]:
+    out: Dict[int, int] = {}
+    for c in commits:
+        hour = time.localtime(c.t).tm_hour
+        out[hour] = out.get(hour, 0) + c.c
+    return out
+
+
+def summarize(commits, idle_threshold: int = 5, session_gap: int = 300,
+              window_seconds: int = 60) -> Summary:
+    commits = sorted(commits, key=lambda c: c.t)
+    secs, _ = active_seconds_and_chars(commits, idle_threshold)
+    return Summary(
+        chars=sum(c.c for c in commits),
+        han=sum(c.han for c in commits),
+        commits=len(commits),
+        sessions=len(split_sessions(commits, session_gap)),
+        active_seconds=secs,
+        net_cpm=net_speed(commits, idle_threshold),
+        gross_cpm=gross_speed(commits, session_gap),
+        peak_cpm=peak_speed(commits, window_seconds),
+        eff=efficiency(commits),
+    )
+
+
+def by_schema(commits, **opts) -> Dict[str, Summary]:
+    groups: Dict[str, list] = {}
+    for c in commits:
+        groups.setdefault(c.s, []).append(c)
+    return {s: summarize(cs, **opts) for s, cs in groups.items()}
 
 
 def main(argv=None) -> int:
