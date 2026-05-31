@@ -60,6 +60,7 @@ def read_log(path) -> List[Commit]:
 
 
 def split_sessions(commits, session_gap: int = 300):
+    """Assumes commits are sorted ascending by t."""
     sessions = []
     cur = []
     for cm in commits:
@@ -73,6 +74,7 @@ def split_sessions(commits, session_gap: int = 300):
 
 
 def active_seconds_and_chars(commits, idle_threshold: int = 5) -> Tuple[int, int]:
+    """Assumes commits are sorted ascending by t."""
     secs = 0
     chars = 0
     for prev, cur in zip(commits, commits[1:]):
@@ -176,6 +178,13 @@ def by_schema(commits, **opts) -> Dict[str, Summary]:
 
 
 def day_bounds(date_str: str) -> Tuple[int, int]:
+    """Local-time [start, end) unix bounds for a 'YYYY-MM-DD' day.
+
+    Uses local midnight via time.mktime plus a fixed 86400s span. On DST
+    transition days the span can be off by up to an hour; acceptable for
+    typing stats. Note by_hour() uses time.localtime (DST-correct), so the
+    two can disagree on transition nights.
+    """
     d = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     start = int(time.mktime(d.timetuple()))
     return start, start + 86400
@@ -247,8 +256,7 @@ def _load(args) -> List[Commit]:
 
 
 def cmd_today(args) -> int:
-    import datetime as _dt
-    today = _dt.date.fromtimestamp(time.time()).isoformat()
+    today = datetime.date.fromtimestamp(time.time()).isoformat()
     lo, hi = day_bounds(today)
     commits = filter_range(read_log(args.log if args.log else log_path()), lo, hi)
     print(format_today(summarize(commits), by_schema(commits)))
@@ -265,6 +273,7 @@ def cmd_report(args) -> int:
 def cmd_export(args) -> int:
     import csv
     commits = _load(args)
+    # CSV is currently the only export format; --csv is accepted for explicitness / forward-compat.
     w = csv.writer(sys.stdout)
     w.writerow(["t", "c", "han", "lat", "dig", "oth", "k", "s"])
     for c in commits:
@@ -294,7 +303,7 @@ def main(argv=None) -> int:
 
     p_export = sub.add_parser("export", help="export raw records")
     _add_log_args(p_export)
-    p_export.add_argument("--csv", action="store_true")
+    p_export.add_argument("--csv", action="store_true", help="输出 CSV（当前唯一格式，默认即为 CSV）")
     p_export.set_defaults(func=cmd_export)
 
     args = parser.parse_args(argv)

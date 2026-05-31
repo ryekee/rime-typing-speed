@@ -36,4 +36,5 @@ def test_report_range_filters(tmp_path, capsys):
     rc = rime_speed.main(["report", "--log", str(log), "--from-ts", "1003", "--to-ts", "1010"])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "t9" in out and "rime_ice" not in out.split("按方案")[-1]
+    assert "t9" in out
+    assert "rime_ice" not in out
