@@ -87,6 +87,39 @@ def net_speed(commits, idle_threshold: int = 5) -> float:
     return chars / secs * 60.0
 
 
+def gross_speed(commits, session_gap: int = 300) -> float:
+    total_chars = 0
+    total_secs = 0
+    for s in split_sessions(commits, session_gap):
+        if len(s) < 2:
+            continue
+        total_chars += sum(c.c for c in s[1:])
+        total_secs += s[-1].t - s[0].t
+    if total_secs <= 0:
+        return 0.0
+    return total_chars / total_secs * 60.0
+
+
+def peak_speed(commits, window_seconds: int = 60) -> float:
+    n = len(commits)
+    if n < 2:
+        return 0.0
+    pref = [0] * (n + 1)
+    for i, c in enumerate(commits):
+        pref[i + 1] = pref[i] + c.c
+    best = 0.0
+    start = 0
+    for end in range(n):
+        while commits[end].t - commits[start].t > window_seconds:
+            start += 1
+        if end > start:
+            chars = pref[end + 1] - pref[start + 1]
+            span = commits[end].t - commits[start].t
+            if span > 0:
+                best = max(best, chars / span * 60.0)
+    return best
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     print("rime-speed: not implemented yet")
