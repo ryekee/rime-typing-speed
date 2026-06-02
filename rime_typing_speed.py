@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rime-speed — measure Chinese commit (typing) speed on the Rime input method.
+"""rime-typing-speed — measure Chinese commit (typing) speed on the Rime input method.
 
 Single-file, standard-library-only CLI. See docs/superpowers for design.
 """
@@ -678,18 +678,18 @@ def _add_log_args(p):
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     parser = argparse.ArgumentParser(
-        prog="rime-speed",
+        prog="rspeed",
         description="统计 Rime（Squirrel）输入法的汉字上屏速度（字/分钟）——衡量汉字输出，不是键盘敲击。",
         epilog=(
             "示例：\n"
-            "  rime-speed today                   今日概况（实时）\n"
-            "  rime-speed report yesterday        昨天\n"
-            "  rime-speed report week             最近 7 天（截止昨天）\n"
-            "  rime-speed report month            最近 30 天（截止昨天）\n"
-            "  rime-speed report 2026-05-31       指定某天\n"
-            "  rime-speed export --csv > out.csv  导出明细\n"
+            "  rspeed today                   今日概况（实时）\n"
+            "  rspeed report yesterday        昨天\n"
+            "  rspeed report week             最近 7 天（截止昨天）\n"
+            "  rspeed report month            最近 30 天（截止昨天）\n"
+            "  rspeed report 2026-05-31       指定某天\n"
+            "  rspeed export --csv > out.csv  导出明细\n"
             "\n"
-            "终端简写 rsp 等价于 rime-speed。各子命令的细节见 `rime-speed <命令> -h`。"
+            "终端简写 rts 等价于 rspeed。各子命令的细节见 `rspeed <命令> -h`。"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -712,9 +712,9 @@ def main(argv=None) -> int:
             "  YYYY-MM-DD   指定某天，如 2026-05-31\n"
             "\n"
             "省略 period 时回退到 --day / --from-ts/--to-ts。示例：\n"
-            "  rime-speed report week\n"
-            "  rime-speed report 2026-05-31\n"
-            "  rime-speed report --from-ts 1748000000 --to-ts 1748600000\n"
+            "  rspeed report week\n"
+            "  rspeed report 2026-05-31\n"
+            "  rspeed report --from-ts 1748000000 --to-ts 1748600000\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

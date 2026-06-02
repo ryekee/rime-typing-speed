@@ -1,6 +1,6 @@
 import importlib
 
-rime_speed = importlib.import_module("rime_speed")
+rime_typing_speed = importlib.import_module("rime_typing_speed")
 
 
 def _seed_rime(tmp_path):
@@ -15,7 +15,7 @@ def test_install_patches_all_schemas(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("RIME_DIR", str(tmp_path))
     monkeypatch.setenv("RIME_SPEED_DATA_DIR", str(tmp_path / "data"))
     _seed_rime(tmp_path)
-    rc = rime_speed.main(["install", "--no-deploy"])
+    rc = rime_typing_speed.main(["install", "--no-deploy"])
     assert rc == 0
     assert (tmp_path / "lua" / "speed_logger.lua").exists()
     assert "speed_logger" in (tmp_path / "rime_ice.custom.yaml").read_text()
@@ -27,9 +27,9 @@ def test_install_is_idempotent(monkeypatch, tmp_path):
     monkeypatch.setenv("RIME_DIR", str(tmp_path))
     monkeypatch.setenv("RIME_SPEED_DATA_DIR", str(tmp_path / "data"))
     _seed_rime(tmp_path)
-    rime_speed.main(["install", "--no-deploy"])
+    rime_typing_speed.main(["install", "--no-deploy"])
     before = (tmp_path / "rime_ice.custom.yaml").read_text()
-    rime_speed.main(["install", "--no-deploy"])
+    rime_typing_speed.main(["install", "--no-deploy"])
     after = (tmp_path / "rime_ice.custom.yaml").read_text()
     assert before == after
 
@@ -38,8 +38,8 @@ def test_uninstall_reverts(monkeypatch, tmp_path):
     monkeypatch.setenv("RIME_DIR", str(tmp_path))
     monkeypatch.setenv("RIME_SPEED_DATA_DIR", str(tmp_path / "data"))
     _seed_rime(tmp_path)
-    rime_speed.main(["install", "--no-deploy"])
-    rime_speed.main(["uninstall", "--no-deploy"])
+    rime_typing_speed.main(["install", "--no-deploy"])
+    rime_typing_speed.main(["uninstall", "--no-deploy"])
     # install created these fresh; uninstall removes our block -> empty -> deleted
     assert not (tmp_path / "rime_ice.custom.yaml").exists()
     assert not (tmp_path / "t9.custom.yaml").exists()
@@ -51,6 +51,6 @@ def test_deploy_not_called_with_no_deploy(monkeypatch, tmp_path):
     monkeypatch.setenv("RIME_SPEED_DATA_DIR", str(tmp_path / "data"))
     _seed_rime(tmp_path)
     called = {"n": 0}
-    monkeypatch.setattr(rime_speed, "deploy", lambda: called.__setitem__("n", called["n"] + 1))
-    rime_speed.main(["install", "--no-deploy"])
+    monkeypatch.setattr(rime_typing_speed, "deploy", lambda: called.__setitem__("n", called["n"] + 1))
+    rime_typing_speed.main(["install", "--no-deploy"])
     assert called["n"] == 0

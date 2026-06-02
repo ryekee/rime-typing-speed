@@ -3,14 +3,14 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rime-speed"
+name = "rime-typing-speed"
 version = "0.1.0"
 description = "统计基于 Rime（Squirrel）的汉字上屏速度（字/分钟）。Measure your Chinese typing (commit) speed on the Rime input method."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "GPL-3.0-only" }
 authors = [{ name = "Ryekee" }]
-keywords = ["rime", "squirrel", "input-method", "typing-speed", "cli", "lua"]
+keywords = ["rime", "squirrel", "input-method", "typing-speed", "cpm", "cli", "lua"]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
@@ -24,8 +24,14 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
+[project.urls]
+Homepage = "https://github.com/ryekee/rime-typing-speed"
+Repository = "https://github.com/ryekee/rime-typing-speed"
+Issues = "https://github.com/ryekee/rime-typing-speed/issues"
+
 [project.scripts]
-rime-speed = "rime_speed:main"
+rspeed = "rime_typing_speed:main"
+rts = "rime_typing_speed:main"
 
 [tool.setuptools]
-py-modules = ["rime_speed"]
+py-modules = ["rime_typing_speed"]

@@ -1,6 +1,6 @@
 import importlib
 
-rime_speed = importlib.import_module("rime_speed")
+rime_typing_speed = importlib.import_module("rime_typing_speed")
 
 
 def _write_log(tmp_path):
@@ -15,7 +15,7 @@ def _write_log(tmp_path):
 
 def test_report_command_prints_stats(tmp_path, capsys):
     log = _write_log(tmp_path)
-    rc = rime_speed.main(["report", "--log", str(log)])
+    rc = rime_typing_speed.main(["report", "--log", str(log)])
     out = capsys.readouterr().out
     assert rc == 0
     assert "字/分钟" in out
@@ -24,7 +24,7 @@ def test_report_command_prints_stats(tmp_path, capsys):
 
 def test_export_csv(tmp_path, capsys):
     log = _write_log(tmp_path)
-    rc = rime_speed.main(["export", "--log", str(log), "--csv"])
+    rc = rime_typing_speed.main(["export", "--log", str(log), "--csv"])
     out = capsys.readouterr().out
     assert rc == 0
     assert out.splitlines()[0] == "t,c,han,lat,dig,oth,k,s"
@@ -33,7 +33,7 @@ def test_export_csv(tmp_path, capsys):
 
 def test_report_range_filters(tmp_path, capsys):
     log = _write_log(tmp_path)
-    rc = rime_speed.main(["report", "--log", str(log), "--from-ts", "1003", "--to-ts", "1010"])
+    rc = rime_typing_speed.main(["report", "--log", str(log), "--from-ts", "1003", "--to-ts", "1010"])
     out = capsys.readouterr().out
     assert rc == 0
     assert "t9" in out
