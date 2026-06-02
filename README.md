@@ -1,5 +1,11 @@
 # rime-typing-speed
 
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
+![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)
+![for Rime / Squirrel](https://img.shields.io/badge/for-Rime%20%2F%20Squirrel-1f6feb.svg)
+![dependencies: 0](https://img.shields.io/badge/dependencies-0-success.svg)
+
 统计基于 Rime（Squirrel）输入法的**汉字上屏速度**（字/分钟，CPM）——衡量的是汉字输出速度，不是键盘敲击速度。
 
 > Measure your real Chinese **output** speed (characters-per-minute) on the [Rime](https://rime.im/) input method. It counts committed characters, not keystrokes. Pure Lua + a zero-dependency Python CLI; no recompiling librime.
