@@ -550,30 +550,36 @@ def cmd_today(args) -> int:
 def resolve_period(period):
     """Map a report period to (start_ts, end_ts, label).
 
-    Accepts None (-> no filter), 'today', 'yesterday', 'week' (the 7 days
-    ending yesterday, excluding the in-progress today), or an explicit
-    'YYYY-MM-DD' date. Raises ValueError on an unrecognized string.
+    Accepts None (-> no filter), 'today', 'yesterday', 'week' (7 days ending
+    yesterday), 'month' (30 days ending yesterday) — both excluding the
+    in-progress today — or an explicit 'YYYY-MM-DD' date. Raises ValueError on
+    an unrecognized string.
     """
     if period is None:
         return None, None, None
     today = datetime.date.fromtimestamp(time.time())
-    if period == "today":
-        d = today.isoformat()
+
+    def one_day(d):
         lo, hi = day_bounds(d)
         return lo, hi, d
-    if period == "yesterday":
-        d = (today - datetime.timedelta(days=1)).isoformat()
-        lo, hi = day_bounds(d)
-        return lo, hi, d
-    if period == "week":
-        start = today - datetime.timedelta(days=7)
+
+    def last_n_days(n):
+        start = today - datetime.timedelta(days=n)
         last = today - datetime.timedelta(days=1)
         lo = day_bounds(start.isoformat())[0]
         hi = day_bounds(today.isoformat())[0]
-        return lo, hi, f"最近7天 ({start.isoformat()} ~ {last.isoformat()})"
+        return lo, hi, f"最近{n}天 ({start.isoformat()} ~ {last.isoformat()})"
+
+    if period == "today":
+        return one_day(today.isoformat())
+    if period == "yesterday":
+        return one_day((today - datetime.timedelta(days=1)).isoformat())
+    if period == "week":
+        return last_n_days(7)
+    if period == "month":
+        return last_n_days(30)
     # otherwise treat as an explicit YYYY-MM-DD date (raises ValueError if bad)
-    lo, hi = day_bounds(period)
-    return lo, hi, period
+    return one_day(period)
 
 
 def cmd_report(args) -> int:
@@ -581,7 +587,7 @@ def cmd_report(args) -> int:
     try:
         lo, hi, label = resolve_period(period)
     except ValueError:
-        print(f"无法识别的区间 '{period}'：可用 today | yesterday | week | YYYY-MM-DD",
+        print(f"无法识别的区间 '{period}'：可用 today | yesterday | week | month | YYYY-MM-DD",
               file=sys.stderr)
         return 2
     if lo is not None:
@@ -662,41 +668,75 @@ def cmd_uninstall(args) -> int:
 
 
 def _add_log_args(p):
-    p.add_argument("--log", default=None, help="path to commits.jsonl")
-    p.add_argument("--day", default=None, help="YYYY-MM-DD (local)")
-    p.add_argument("--from-ts", dest="from_ts", type=int, default=None)
-    p.add_argument("--to-ts", dest="to_ts", type=int, default=None)
+    p.add_argument("--log", default=None,
+                   help="日志文件路径（默认 ~/Library/Application Support/rime-speed/commits.jsonl）")
+    p.add_argument("--day", default=None, help="指定某天 YYYY-MM-DD（本地时区）")
+    p.add_argument("--from-ts", dest="from_ts", type=int, default=None, help="起始 unix 时间戳（秒）")
+    p.add_argument("--to-ts", dest="to_ts", type=int, default=None, help="结束 unix 时间戳（秒）")
 
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    parser = argparse.ArgumentParser(prog="rime-speed", description="Chinese typing-speed stats for Rime")
-    sub = parser.add_subparsers(dest="cmd")
+    parser = argparse.ArgumentParser(
+        prog="rime-speed",
+        description="统计 Rime（Squirrel）输入法的汉字上屏速度（字/分钟）——衡量汉字输出，不是键盘敲击。",
+        epilog=(
+            "示例：\n"
+            "  rime-speed today                   今日概况（实时）\n"
+            "  rime-speed report yesterday        昨天\n"
+            "  rime-speed report week             最近 7 天（截止昨天）\n"
+            "  rime-speed report month            最近 30 天（截止昨天）\n"
+            "  rime-speed report 2026-05-31       指定某天\n"
+            "  rime-speed export --csv > out.csv  导出明细\n"
+            "\n"
+            "终端简写 rsp 等价于 rime-speed。各子命令的细节见 `rime-speed <命令> -h`。"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="cmd", metavar="<命令>")
 
-    p_today = sub.add_parser("today", help="today's stats")
-    p_today.add_argument("--log", default=None)
+    p_today = sub.add_parser("today", help="今日概况（实时）")
+    p_today.add_argument("--log", default=None, help="日志文件路径")
     p_today.set_defaults(func=cmd_today)
 
-    p_report = sub.add_parser("report", help="stats for a period (today | yesterday | week | YYYY-MM-DD)")
-    p_report.add_argument("period", nargs="?", default=None,
-                          help="today | yesterday | week | YYYY-MM-DD (omit to use --day/--from-ts/--to-ts)")
+    p_report = sub.add_parser(
+        "report",
+        help="按区间统计（today | yesterday | week | month | YYYY-MM-DD）",
+        description="按区间出统计：净/毛/峰值速度、码字效率、分方案、按小时分布。",
+        epilog=(
+            "区间关键字（位置参数 period）：\n"
+            "  today        今天（进行中；比 `today` 命令多了按小时分布）\n"
+            "  yesterday    昨天\n"
+            "  week         最近 7 天，截止昨天（不含今天）\n"
+            "  month        最近 30 天，截止昨天（不含今天）\n"
+            "  YYYY-MM-DD   指定某天，如 2026-05-31\n"
+            "\n"
+            "省略 period 时回退到 --day / --from-ts/--to-ts。示例：\n"
+            "  rime-speed report week\n"
+            "  rime-speed report 2026-05-31\n"
+            "  rime-speed report --from-ts 1748000000 --to-ts 1748600000\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_report.add_argument("period", nargs="?", default=None, metavar="period",
+                          help="today | yesterday | week | month | YYYY-MM-DD（省略则用 --day/--from-ts/--to-ts）")
     _add_log_args(p_report)
     p_report.set_defaults(func=cmd_report)
 
-    p_export = sub.add_parser("export", help="export raw records")
+    p_export = sub.add_parser("export", help="导出原始记录（CSV）")
     _add_log_args(p_export)
     p_export.add_argument("--csv", action="store_true", help="输出 CSV（当前唯一格式，默认即为 CSV）")
     p_export.set_defaults(func=cmd_export)
 
-    p_install = sub.add_parser("install", help="install the Lua logger into your schemas")
-    p_install.add_argument("--schema", default=None, help="only this schema (default: all)")
-    p_install.add_argument("--no-deploy", action="store_true")
+    p_install = sub.add_parser("install", help="安装 Lua 记录器并挂载到各方案，然后部署")
+    p_install.add_argument("--schema", default=None, help="只挂这个方案（默认：全部已启用方案）")
+    p_install.add_argument("--no-deploy", action="store_true", help="不触发 Squirrel 重新部署")
     p_install.set_defaults(func=cmd_install)
 
-    p_uninstall = sub.add_parser("uninstall", help="remove the Lua logger")
-    p_uninstall.add_argument("--schema", default=None)
-    p_uninstall.add_argument("--no-deploy", action="store_true")
-    p_uninstall.add_argument("--purge", action="store_true", help="also delete the log file")
+    p_uninstall = sub.add_parser("uninstall", help="卸载（还原配置 + 删 Lua）")
+    p_uninstall.add_argument("--schema", default=None, help="只卸这个方案（默认：全部）")
+    p_uninstall.add_argument("--no-deploy", action="store_true", help="不触发 Squirrel 重新部署")
+    p_uninstall.add_argument("--purge", action="store_true", help="连日志文件一起删除")
     p_uninstall.set_defaults(func=cmd_uninstall)
 
     args = parser.parse_args(argv)

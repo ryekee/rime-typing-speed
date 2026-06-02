@@ -101,3 +101,27 @@ def test_report_invalid_period_returns_error(tmp_path, capsys):
     log.write_text("")
     rc = rime_speed.main(["report", "bogus", "--log", str(log)])
     assert rc == 2
+
+
+def test_resolve_period_month_is_30_days_ending_yesterday():
+    today = _today()
+    lo, hi, label = rime_speed.resolve_period("month")
+    assert lo == rime_speed.day_bounds((today - datetime.timedelta(days=30)).isoformat())[0]
+    assert hi == rime_speed.day_bounds(today.isoformat())[0]
+    assert (today - datetime.timedelta(days=30)).isoformat() in label
+    assert (today - datetime.timedelta(days=1)).isoformat() in label
+
+
+def test_report_month_includes_within_excludes_today_and_old(tmp_path, capsys):
+    today = _today()
+    in_month = rime_speed.day_bounds((today - datetime.timedelta(days=20)).isoformat())[0] + 50
+    today_ts = rime_speed.day_bounds(today.isoformat())[0] + 50
+    old_ts = rime_speed.day_bounds((today - datetime.timedelta(days=40)).isoformat())[0] + 50
+    log = tmp_path / "c.jsonl"
+    _write(log, [(in_month, 4, 4, "rime_ice"), (today_ts, 7, 7, "t9"), (old_ts, 3, 3, "liangfen")])
+    rc = rime_speed.main(["report", "month", "--log", str(log)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "rime_ice" in out      # within the month
+    assert "t9" not in out        # today excluded
+    assert "liangfen" not in out  # 40 days ago excluded
