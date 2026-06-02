@@ -10,13 +10,14 @@ def C(t, c, k=0, s="rime_ice", han=None):
     return rime_typing_speed.Commit(t=t, c=c, han=han, lat=0, dig=0, oth=0, k=k, s=s)
 
 
-def test_efficiency_chars_per_keystroke():
-    commits = [C(0, 2, k=4), C(2, 3, k=2)]  # 5 chars / 6 keys
-    assert rime_typing_speed.efficiency(commits) == pytest.approx(5 / 6)
+def test_keys_per_char():
+    commits = [C(0, 2, k=4), C(2, 3, k=2)]  # 6 keys / 5 chars
+    assert rime_typing_speed.keys_per_char(commits) == pytest.approx(6 / 5)
 
 
-def test_efficiency_zero_keys():
-    assert rime_typing_speed.efficiency([C(0, 5, k=0)]) == 0.0
+def test_keys_per_char_guards_zero():
+    assert rime_typing_speed.keys_per_char([]) == 0.0              # no chars
+    assert rime_typing_speed.keys_per_char([C(0, 5, k=0)]) == 0.0  # no keystrokes logged
 
 
 def test_by_hour_buckets_local_chars():
@@ -41,4 +42,4 @@ def test_summarize_fields():
     assert s.commits == 3
     assert s.sessions == 1
     assert s.net_cpm > 0
-    assert s.eff == pytest.approx(7 / 9)
+    assert s.kpc == pytest.approx(9 / 7)

@@ -24,8 +24,8 @@ def test_format_today_contains_headline_numbers():
     text = rime_typing_speed.format_today(summary, rime_typing_speed.by_schema(commits))
     assert "字/分钟" in text
     assert "7" in text          # total chars
-    assert "净速度" in text
-    assert "毛速度" in text
+    assert "活跃速度" in text
+    assert "上屏速度" in text
 
 
 def test_format_report_includes_label_and_schema():

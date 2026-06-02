@@ -134,18 +134,19 @@ class Summary(NamedTuple):
     commits: int
     sessions: int
     active_seconds: int
-    net_cpm: float
-    gross_cpm: float
-    peak_cpm: float
-    eff: float
+    net_cpm: float    # 活跃速度: chars/min over active (idle-trimmed, >5s) time
+    gross_cpm: float  # 上屏速度: chars/min over wall-clock session time
+    peak_cpm: float   # 峰值速度: best rolling-window rate
+    kpc: float        # 输入效率/码长: keystrokes per character
 
 
-def efficiency(commits) -> float:
+def keys_per_char(commits) -> float:
+    """输入效率/码长：平均每字击键数（keystrokes per character）。"""
     chars = sum(c.c for c in commits)
     keys = sum(c.k for c in commits)
-    if keys <= 0:
+    if chars <= 0:
         return 0.0
-    return chars / keys
+    return keys / chars
 
 
 def by_hour(commits) -> Dict[int, int]:
@@ -169,7 +170,7 @@ def summarize(commits, idle_threshold: int = 5, session_gap: int = 300,
         net_cpm=net_speed(commits, idle_threshold),
         gross_cpm=gross_speed(commits, session_gap),
         peak_cpm=peak_speed(commits, window_seconds),
-        eff=efficiency(commits),
+        kpc=keys_per_char(commits),
     )
 
 
@@ -206,16 +207,16 @@ def format_today(summary: Summary, by_schema_map: Dict[str, Summary]) -> str:
     lines = [
         "今日打字统计",
         f"  上屏字数：{summary.chars}（汉字 {summary.han}）",
-        f"  净速度：{summary.net_cpm:.1f} 字/分钟（活跃 {_fmt_minutes(summary.active_seconds)}）",
-        f"  毛速度：{summary.gross_cpm:.1f} 字/分钟",
+        f"  活跃速度：{summary.net_cpm:.1f} 字/分钟（活跃 {_fmt_minutes(summary.active_seconds)}）",
+        f"  上屏速度：{summary.gross_cpm:.1f} 字/分钟",
         f"  峰值速度：{summary.peak_cpm:.1f} 字/分钟",
-        f"  码字效率：{summary.eff:.2f} 字/击键",
+        f"  输入效率：{summary.kpc:.2f} 击键/字",
         f"  会话数：{summary.sessions}，上屏次数：{summary.commits}",
     ]
     if len(by_schema_map) > 1:
         lines.append("  按方案：")
         for name, s in sorted(by_schema_map.items(), key=lambda kv: -kv[1].chars):
-            lines.append(f"    {name}: {s.chars} 字，净 {s.net_cpm:.1f} 字/分钟")
+            lines.append(f"    {name}: {s.chars} 字，活跃 {s.net_cpm:.1f} 字/分钟")
     return "\n".join(lines)
 
 
@@ -224,16 +225,16 @@ def format_report(label: str, summary: Summary, by_schema_map: Dict[str, Summary
     lines = [
         f"{label} 打字统计",
         f"  上屏字数：{summary.chars}（汉字 {summary.han}）",
-        f"  净速度：{summary.net_cpm:.1f} 字/分钟",
-        f"  毛速度：{summary.gross_cpm:.1f} 字/分钟",
+        f"  活跃速度：{summary.net_cpm:.1f} 字/分钟",
+        f"  上屏速度：{summary.gross_cpm:.1f} 字/分钟",
         f"  峰值速度：{summary.peak_cpm:.1f} 字/分钟",
-        f"  码字效率：{summary.eff:.2f} 字/击键",
+        f"  输入效率：{summary.kpc:.2f} 击键/字",
         f"  会话数：{summary.sessions}，上屏次数：{summary.commits}",
     ]
     if by_schema_map:
         lines.append("  按方案：")
         for name, s in sorted(by_schema_map.items(), key=lambda kv: -kv[1].chars):
-            lines.append(f"    {name}: {s.chars} 字，净 {s.net_cpm:.1f} 字/分钟")
+            lines.append(f"    {name}: {s.chars} 字，活跃 {s.net_cpm:.1f} 字/分钟")
     if by_hour_map:
         lines.append("  按小时（字数）：")
         for hour in sorted(by_hour_map):
@@ -702,7 +703,7 @@ def main(argv=None) -> int:
     p_report = sub.add_parser(
         "report",
         help="按区间统计（today | yesterday | week | month | YYYY-MM-DD）",
-        description="按区间出统计：净/毛/峰值速度、码字效率、分方案、按小时分布。",
+        description="按区间出统计：活跃/上屏/峰值速度、输入效率、分方案、按小时分布。",
         epilog=(
             "区间关键字（位置参数 period）：\n"
             "  today        今天（进行中；比 `today` 命令多了按小时分布）\n"
