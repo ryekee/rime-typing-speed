@@ -547,9 +547,48 @@ def cmd_today(args) -> int:
     return 0
 
 
+def resolve_period(period):
+    """Map a report period to (start_ts, end_ts, label).
+
+    Accepts None (-> no filter), 'today', 'yesterday', 'week' (the 7 days
+    ending yesterday, excluding the in-progress today), or an explicit
+    'YYYY-MM-DD' date. Raises ValueError on an unrecognized string.
+    """
+    if period is None:
+        return None, None, None
+    today = datetime.date.fromtimestamp(time.time())
+    if period == "today":
+        d = today.isoformat()
+        lo, hi = day_bounds(d)
+        return lo, hi, d
+    if period == "yesterday":
+        d = (today - datetime.timedelta(days=1)).isoformat()
+        lo, hi = day_bounds(d)
+        return lo, hi, d
+    if period == "week":
+        start = today - datetime.timedelta(days=7)
+        last = today - datetime.timedelta(days=1)
+        lo = day_bounds(start.isoformat())[0]
+        hi = day_bounds(today.isoformat())[0]
+        return lo, hi, f"最近7天 ({start.isoformat()} ~ {last.isoformat()})"
+    # otherwise treat as an explicit YYYY-MM-DD date (raises ValueError if bad)
+    lo, hi = day_bounds(period)
+    return lo, hi, period
+
+
 def cmd_report(args) -> int:
-    commits = _load(args)
-    label = args.day if args.day else "区间"
+    period = getattr(args, "period", None)
+    try:
+        lo, hi, label = resolve_period(period)
+    except ValueError:
+        print(f"无法识别的区间 '{period}'：可用 today | yesterday | week | YYYY-MM-DD",
+              file=sys.stderr)
+        return 2
+    if lo is not None:
+        commits = filter_range(read_log(args.log if args.log else log_path()), lo, hi)
+    else:
+        commits = _load(args)
+        label = args.day if args.day else "区间"
     print(format_report(label, summarize(commits), by_schema(commits), by_hour(commits)))
     return 0
 
@@ -638,7 +677,9 @@ def main(argv=None) -> int:
     p_today.add_argument("--log", default=None)
     p_today.set_defaults(func=cmd_today)
 
-    p_report = sub.add_parser("report", help="stats for a day or timestamp range")
+    p_report = sub.add_parser("report", help="stats for a period (today | yesterday | week | YYYY-MM-DD)")
+    p_report.add_argument("period", nargs="?", default=None,
+                          help="today | yesterday | week | YYYY-MM-DD (omit to use --day/--from-ts/--to-ts)")
     _add_log_args(p_report)
     p_report.set_defaults(func=cmd_report)
 

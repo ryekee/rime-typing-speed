@@ -19,12 +19,17 @@ rime-speed install        # 写入 Lua、挂载到各方案、部署
 ## 使用
 
 ```bash
-rime-speed today                       # 今日统计
-rime-speed report --day 2026-05-31     # 指定日期
-rime-speed report --from-ts T --to-ts T
-rime-speed export --csv > out.csv      # 导出
+rime-speed today                       # 今日概况（实时）
+rime-speed report yesterday            # 昨天
+rime-speed report week                 # 最近 7 天（截止昨天，不含今天）
+rime-speed report today                # 今天（详细，含按小时分布）
+rime-speed report 2026-05-31           # 指定某天
+rime-speed report --from-ts T --to-ts T   # 自定义时间区间（unix 秒）
+rime-speed export --csv > out.csv      # 导出明细
 rime-speed uninstall                   # 卸载（加 --purge 删日志）
 ```
+
+> `report` 接受位置参数 `today | yesterday | week | YYYY-MM-DD`；省略它则回退到 `--day` / `--from-ts/--to-ts`。`rsp` 是等价的简写（终端别名 + `~/.local/bin/rsp` 软链）。
 
 ## 指标说明
 
